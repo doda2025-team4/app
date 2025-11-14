@@ -17,6 +17,9 @@ import frontend.data.GoodSentence;
 import frontend.data.Sms;
 import jakarta.servlet.http.HttpServletRequest;
 
+import com.github.doda2025_team4.lib.VersionUtil;
+import java.io.IOException;
+
 @Controller
 @RequestMapping(path = "/sms")
 public class FrontendController {
@@ -25,10 +28,20 @@ public class FrontendController {
 
     private RestTemplateBuilder rest;
 
+    private VersionUtil goodSentenceVersionUtil;
+    private String goodSentenceVersionUtilLibName =  "";
+    private String goodSentenceVersionUtilLibVersion = "";
+
     public FrontendController(RestTemplateBuilder rest, Environment env) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
         assertModelHost();
+
+        goodSentenceVersionUtil = new VersionUtil();
+        try {
+            goodSentenceVersionUtilLibName = "[under construction]";
+            goodSentenceVersionUtilLibVersion = goodSentenceVersionUtil.getVersion();
+        } catch(IOException e) {}
     }
 
     private void assertModelHost() {
@@ -71,10 +84,7 @@ public class FrontendController {
     @ResponseBody
     public GoodSentence goodsentence() {
         String goodSentence = "I am a Good Sentence!";
-        String name = "[under construction]";
-        String version = "[under construction]";
-        
-        return new GoodSentence(goodSentence, name, version);
+        return new GoodSentence(goodSentence, goodSentenceVersionUtilLibName, goodSentenceVersionUtilLibVersion);
     }
 
     private String getPrediction(Sms sms) {
