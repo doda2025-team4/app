@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import frontend.data.GoodSentence;
 import frontend.data.Sms;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -64,6 +65,16 @@ public class FrontendController {
         sms.result = getPrediction(sms);
         System.out.printf("Prediction: %s\n", sms.result);
         return sms;
+    }
+
+    @GetMapping("/goodsentence")
+    @ResponseBody
+    public GoodSentence goodsentence() {
+        String goodSentence = "I am a Good Sentence!";
+        String name = "[under construction]";
+        String version = "[under construction]";
+        
+        return new GoodSentence(goodSentence, name, version);
     }
 
     private String getPrediction(Sms sms) {
