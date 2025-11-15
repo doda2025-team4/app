@@ -27,10 +27,10 @@ I have added a button that fills the message text box with a good sentence. This
 
 ## F2
 
-I have added the `lib-version` library package as a dependency, as specified on the package page on the `lib-version` repo. To connect to the repo, I had to create a `settings.xml` file containing a personal access token to my GitHub account. For this, I used a organization secret called `MAVEN_DEPLOY_TOKEN`. To use the settings, a new start command had to be used:
+I have added the `lib-version` library package as a dependency, as specified on the package page on the `lib-version` repo. To connect to the repo, I had to create a `settings.xml` file containing a personal access token to my GitHub account. For future use in github actions or wherever in github, I created an organization secret called `MAVEN_DEPLOY_TOKEN`. However, for now, just declaring it the environment works:
 
 ```bash
-docker run --rm -it --add-host=host.docker.internal:host-gateway -p 8080:8080 -v ./:/usr/src/app:Z -w /usr/src/app maven:3.9.11-eclipse-temurin-25-noble /bin/bash -c 'MODEL_HOST="http://host.docker.internal:8081" mvn spring-boot:run --settings .github/workspace/settings.xml' 
+docker run --rm -it --add-host=host.docker.internal:host-gateway -p 8080:8080 -v ./:/usr/src/app:Z -w /usr/src/app maven:3.9.11-eclipse-temurin-25-noble /bin/bash -c 'PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx MODEL_HOST="http://host.docker.internal:8081" mvn spring-boot:run --settings .github/workspace/settings.xml' 
 ```
 
 Inspiration:
