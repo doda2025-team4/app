@@ -24,7 +24,7 @@
         <server>
             <id>github</id>
             <username>${env.GITHUB_ACTOR}</username>
-            <password>${secrets.MAVEN_DEPLOY_TOKEN}</password>
+            <password>${env.PAT}</password>
         </server>
     </servers>
 </settings>
