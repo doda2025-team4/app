@@ -13,8 +13,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import frontend.data.GoodSentence;
 import frontend.data.Sms;
 import jakarta.servlet.http.HttpServletRequest;
+
+import com.github.doda2025_team4.lib.GoodSentenceGenerator;
+import com.github.doda2025_team4.lib.VersionUtil;
+import java.io.IOException;
 
 @Controller
 @RequestMapping(path = "/sms")
@@ -24,10 +29,19 @@ public class FrontendController {
 
     private RestTemplateBuilder rest;
 
+    private final GoodSentenceGenerator goodSentenceGenerator;
+    private final String goodSentenceVersionUtilLibName;
+    private final String goodSentenceVersionUtilLibVersion;
+
     public FrontendController(RestTemplateBuilder rest, Environment env) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
         assertModelHost();
+
+        final VersionUtil goodSentenceVersionUtil = new VersionUtil();
+        goodSentenceGenerator = new GoodSentenceGenerator();
+        goodSentenceVersionUtilLibName = goodSentenceVersionUtil.getName();
+        goodSentenceVersionUtilLibVersion = goodSentenceVersionUtil.getVersion();
     }
 
     private void assertModelHost() {
@@ -64,6 +78,13 @@ public class FrontendController {
         sms.result = getPrediction(sms);
         System.out.printf("Prediction: %s\n", sms.result);
         return sms;
+    }
+
+    @GetMapping("/goodsentence")
+    @ResponseBody
+    public GoodSentence goodsentence() {
+        final String goodSentence = goodSentenceGenerator.generateSentence();
+        return new GoodSentence(goodSentence, goodSentenceVersionUtilLibName, goodSentenceVersionUtilLibVersion);
     }
 
     private String getPrediction(Sms sms) {

@@ -15,7 +15,7 @@ $(document).ready(function() {
 		$("#result").html()
 	}
 
-	$("button").click(function (e) {
+	$("#send-button").click(function (e) {
 		e.stopPropagation()
 		e.preventDefault()
 
@@ -41,6 +41,24 @@ $(document).ready(function() {
 		$("#result").html("The classifier " + (wasRight ? "agrees" : "disagrees"))		
 		$("#result").show()
 	}
+
+	$("#good-sentence-button").click(function (e) {
+		e.stopPropagation()
+		e.preventDefault()
+		
+		$.ajax({
+			type: "GET",
+			url: "./goodsentence",
+			success: handleGoodSentenceResult,
+			error: handleError	
+		})
+	})
+
+	function handleGoodSentenceResult(res) {
+		$("textarea").val(res.goodSentence)
+		$("#good-sentence-origin").html(`This good sentence was brought to you by the ${res.name} library, version ${res.version}`)
+		$("#good-sentence-origin").show()
+	}
 	
 	function handleError(e) {
 		cleanResult()		
@@ -49,8 +67,9 @@ $(document).ready(function() {
 		$("#result").show()
 	}
 	
-	$("textarea").on('keypress',function(e) {
+	$("textarea").on('change textInput input', function(e) {
 		$("#result").hide()
+		$("#good-sentence-origin").hide()
 	})
 	
 	$("input").click(function(e) {
