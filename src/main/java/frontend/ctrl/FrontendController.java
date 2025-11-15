@@ -17,6 +17,7 @@ import frontend.data.GoodSentence;
 import frontend.data.Sms;
 import jakarta.servlet.http.HttpServletRequest;
 
+import com.github.doda2025_team4.lib.GoodSentenceGenerator;
 import com.github.doda2025_team4.lib.VersionUtil;
 import java.io.IOException;
 
@@ -28,20 +29,19 @@ public class FrontendController {
 
     private RestTemplateBuilder rest;
 
-    private VersionUtil goodSentenceVersionUtil;
-    private String goodSentenceVersionUtilLibName =  "";
-    private String goodSentenceVersionUtilLibVersion = "";
+    private final GoodSentenceGenerator goodSentenceGenerator;
+    private final String goodSentenceVersionUtilLibName;
+    private final String goodSentenceVersionUtilLibVersion;
 
     public FrontendController(RestTemplateBuilder rest, Environment env) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
         assertModelHost();
 
-        goodSentenceVersionUtil = new VersionUtil();
-        try {
-            goodSentenceVersionUtilLibName = "[under construction]";
-            goodSentenceVersionUtilLibVersion = goodSentenceVersionUtil.getVersion();
-        } catch(IOException e) {}
+        final VersionUtil goodSentenceVersionUtil = new VersionUtil();
+        goodSentenceGenerator = new GoodSentenceGenerator();
+        goodSentenceVersionUtilLibName = goodSentenceVersionUtil.getName();
+        goodSentenceVersionUtilLibVersion = goodSentenceVersionUtil.getVersion();
     }
 
     private void assertModelHost() {
@@ -83,7 +83,7 @@ public class FrontendController {
     @GetMapping("/goodsentence")
     @ResponseBody
     public GoodSentence goodsentence() {
-        String goodSentence = "I am a Good Sentence!";
+        final String goodSentence = goodSentenceGenerator.generateSentence();
         return new GoodSentence(goodSentence, goodSentenceVersionUtilLibName, goodSentenceVersionUtilLibVersion);
     }
 
