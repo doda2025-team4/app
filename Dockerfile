@@ -1,4 +1,4 @@
-FROM maven:3.9-amazoncorretto-25 AS build
+FROM --platform=$BUILDPLATFORM maven:3.9-amazoncorretto-25 AS build
 WORKDIR /app
 
 # Copy pom.xml and source code
@@ -7,8 +7,7 @@ COPY src ./src
 
 RUN mvn clean package
 
-# Runtime stage
-FROM amazoncorretto:25
+FROM --platform=$TARGETPLATFORM amazoncorretto:25
 WORKDIR /app
 
 # Copy the built jar from build stage
