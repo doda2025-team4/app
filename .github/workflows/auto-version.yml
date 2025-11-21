@@ -1,0 +1,97 @@
+name: Auto Version
+
+on:
+  push:
+    branches:
+      - main
+      - f8
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.next.outputs.new }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read current version from pom.xml
+        id: read
+        run: |
+          VERSION=$(sed -n '/<parent>/,/<\/parent>/! s/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml | head -n1)
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine bump type (semantic)
+        id: bump
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          if echo "$MSG" | grep -E "(BREAKING CHANGE|!:)"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -E "^feat"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compute next version and update pom.xml
+        id: next
+        run: |
+          CUR=${{ steps.read.outputs.current }}
+          TYPE=${{ steps.bump.outputs.type }}
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CUR"
+
+          if [ "$TYPE" = "major" ]; then
+            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif [ "$TYPE" = "minor" ]; then
+            MINOR=$((MINOR+1)); PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+
+          NEW="$MAJOR.$MINOR.$PATCH"
+
+          sed -i -E "/<parent>/,/<\/parent>/! s|<version>.*</version>|<version>$NEW</version>|" pom.xml
+
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Commit updated version
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pom.xml
+          git commit -m "chore: bump version to ${{ steps.next.outputs.new }}" || echo "No changes"
+          git push
+
+      - name: Create/update tag and release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.next.outputs.new }}"
+
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --generate-notes
+          else
+            echo "Release $TAG already exists, skipping edit"
+          fi
+
+  release-image:
+    needs: bump
+    uses: ./.github/workflows/release-image.yml
+    with:
+      version: ${{ needs.bump.outputs.new-version }}
+      branch: ${{ github.ref_name }}
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
