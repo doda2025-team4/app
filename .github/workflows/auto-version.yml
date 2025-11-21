@@ -14,15 +14,20 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       new-version: ${{ steps.next.outputs.new }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install xmllint
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Maven (if not already in runner)
+        run: sudo apt-get update && sudo apt-get install -y maven
 
       - name: Read current version from pom.xml
         id: read
@@ -40,6 +45,7 @@ jobs:
             echo "type=minor" >> $GITHUB_OUTPUT
           else
             echo "type=patch" >> $GITHUB_OUTPUT
+          fi
 
       - name: Compute next version and update pom.xml
         id: next
@@ -59,33 +65,27 @@ jobs:
 
           NEW="$MAJOR.$MINOR.$PATCH"
 
-          # Authoritative: update pom.xml with the computed version
-          xmllint --shell pom.xml <<EOF
-          setns x=http://maven.apache.org/POM/4.0.0
-          cd /x:project
-          set version $NEW
-          save
-          EOF
+          # Authoritative version update using Maven
+          mvn versions:set -DnewVersion=$NEW -DgenerateBackupPoms=false
 
           echo "new=$NEW" >> $GITHUB_OUTPUT
 
-      - name: Commit authoritative version
+      - name: Commit updated version
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add pom.xml
-          git commit -m "chore: authoritative bump to version ${{ steps.next.outputs.new }}" || echo "No changes"
+          git commit -m "chore: bump version to ${{ steps.next.outputs.new }}" || echo "No changes"
           git push
 
-      - name: Create authoritative tag and release
+      - name: Create tag and release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.next.outputs.new }}"
-          git tag -f "$TAG"
-          git push origin -f "$TAG"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --generate-notes
-          else
-            gh release create "$TAG" --generate-notes
+          # Create tag only if it doesn't exist
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
           fi
+          gh release create "$TAG" --generate-notes
