@@ -85,3 +85,14 @@ jobs:
           else
             gh release edit "$TAG"
           fi
+          
+      - name: Trigger container image workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "release_image.yml",
+              ref: context.ref
+            });
