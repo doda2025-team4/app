@@ -2,6 +2,16 @@ name: Release Container Image
 
 on:
   workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      branch:
+        required: true
+        type: string
+    secrets:
+      token:
+        required: true
 
 jobs:
   build-and-push:
