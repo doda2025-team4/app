@@ -12,6 +12,8 @@ permissions:
 jobs:
   bump:
     runs-on: ubuntu-latest
+    outputs:
+      new-version: ${{ steps.next.outputs.new }}
 
     steps:
       - name: Checkout
@@ -21,7 +23,6 @@ jobs:
 
       - name: Install xmllint
         run: sudo apt-get update && sudo apt-get install -y libxml2-utils
-
 
       - name: Read current version from pom.xml
         id: read
@@ -33,14 +34,12 @@ jobs:
         id: bump
         run: |
           MSG=$(git log -1 --pretty=%B)
-
           if echo "$MSG" | grep -E "(BREAKING CHANGE|!:)"; then
             echo "type=major" >> $GITHUB_OUTPUT
           elif echo "$MSG" | grep -E "^feat"; then
             echo "type=minor" >> $GITHUB_OUTPUT
           else
             echo "type=patch" >> $GITHUB_OUTPUT
-          fi
 
       - name: Compute next version and update pom.xml
         id: next
@@ -60,7 +59,7 @@ jobs:
 
           NEW="$MAJOR.$MINOR.$PATCH"
 
-          # Update pom.xml
+          # Authoritative: update pom.xml with the computed version
           xmllint --shell pom.xml <<EOF
           setns x=http://maven.apache.org/POM/4.0.0
           cd /x:project
@@ -70,19 +69,23 @@ jobs:
 
           echo "new=$NEW" >> $GITHUB_OUTPUT
 
-      - name: Commit updated version
+      - name: Commit authoritative version
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add pom.xml
-          git commit -m "chore: bump version to ${{ steps.next.outputs.new }}"
+          git commit -m "chore: authoritative bump to version ${{ steps.next.outputs.new }}" || echo "No changes"
           git push
 
-      - name: Create tag and release
+      - name: Create authoritative tag and release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="v${{ steps.next.outputs.new }}"
-          git tag "$TAG"
-          git push origin "$TAG"
-          gh release create "$TAG" --generate-notes
+          git tag -f "$TAG"
+          git push origin -f "$TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --generate-notes
+          else
+            gh release create "$TAG" --generate-notes
+          fi
