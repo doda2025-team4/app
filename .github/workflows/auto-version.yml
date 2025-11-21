@@ -37,6 +37,7 @@ jobs:
             echo "type=minor" >> $GITHUB_OUTPUT
           else
             echo "type=patch" >> $GITHUB_OUTPUT
+          fi
 
       - name: Compute next version and update pom.xml
         id: next
