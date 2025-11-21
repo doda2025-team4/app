@@ -83,5 +83,5 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" --generate-notes
           else
-            gh release edit "$TAG" --generate-notes
+            gh release edit "$TAG"
           fi
