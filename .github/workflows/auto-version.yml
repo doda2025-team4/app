@@ -1,0 +1,83 @@
+name: Auto Version
+
+on:
+  push:
+    branches:
+      - main
+      - f8
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read current version from pom.xml
+        id: read
+        run: |
+          VERSION=$(xmllint --xpath "string(//project/version)" pom.xml)
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine bump type (semantic)
+        id: bump
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+
+          if echo "$MSG" | grep -E "(BREAKING CHANGE|!:)"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+          elif echo "$MSG" | grep -E "^feat"; then
+            echo "type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "type=patch" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compute next version and update pom.xml
+        id: next
+        run: |
+          CUR=${{ steps.read.outputs.current }}
+          TYPE=${{ steps.bump.outputs.type }}
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CUR"
+
+          if [ "$TYPE" = "major" ]; then
+            MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif [ "$TYPE" = "minor" ]; then
+            MINOR=$((MINOR+1)); PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+
+          NEW="$MAJOR.$MINOR.$PATCH"
+
+          # Update pom.xml
+          xmllint --shell pom.xml <<EOF
+cd /project
+set version $NEW
+save
+EOF
+
+          echo "new=$NEW" >> $GITHUB_OUTPUT
+
+      - name: Commit updated version
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pom.xml
+          git commit -m "chore: bump version to ${{ steps.next.outputs.new }}"
+          git push
+
+      - name: Create tag and release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.next.outputs.new }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --generate-notes
