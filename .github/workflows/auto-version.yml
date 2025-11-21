@@ -58,10 +58,11 @@ jobs:
 
           # Update pom.xml
           xmllint --shell pom.xml <<EOF
-cd /project
-set version $NEW
-save
-EOF
+          setns x=http://maven.apache.org/POM/4.0.0
+          cd /x:project
+          set version $NEW
+          save
+          EOF
 
           echo "new=$NEW" >> $GITHUB_OUTPUT
 
