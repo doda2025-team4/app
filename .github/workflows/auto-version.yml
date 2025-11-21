@@ -85,10 +85,10 @@ jobs:
           else
             gh release edit "$TAG"
           fi
-          
+
   release-image:
     needs: bump
-    uses: ./.github/workflows/release_image.yml
+    uses: ./.github/workflows/release-image.yml
     with:
       version: ${{ needs.bump.outputs.new-version }}
       branch: ${{ github.ref_name }}
