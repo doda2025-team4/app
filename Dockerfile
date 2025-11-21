@@ -10,6 +10,9 @@ RUN mvn clean package
 FROM --platform=$TARGETPLATFORM amazoncorretto:25
 WORKDIR /app
 
+ENV SERVER_PORT=8080
+ENV MODEL_HOST=http://model-service:8081
+
 # Copy the built jar from build stage
 COPY --from=build /app/target/*.jar app.jar
 
