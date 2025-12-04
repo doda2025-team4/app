@@ -1,11 +1,15 @@
+# syntax=docker/dockerfile:1
 FROM --platform=$BUILDPLATFORM maven:3.9-amazoncorretto-25 AS build
 WORKDIR /app
 
 # Copy pom.xml and source code
 COPY pom.xml .
+COPY ./.github/workspace/settings.xml .
 COPY src ./src
 
-RUN mvn clean package
+# Get the GitHub Personal Access Token from the environment and then build the package
+RUN --mount=type=secret,id=pat \
+    mvn clean package --settings ./settings.xml -Dgithub.pat=$(cat /run/secrets/pat)
 
 FROM --platform=$TARGETPLATFORM amazoncorretto:25
 WORKDIR /app

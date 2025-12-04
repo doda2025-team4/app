@@ -20,7 +20,19 @@ It is possible to change the port through either the docker-compose file, or thr
 To run the app, run:
 
 ```bash
-docker run --rm -it --add-host=host.docker.internal:host-gateway -p 8080:8080 -v ./:/usr/src/app:Z -w /usr/src/app maven:3.9.11-eclipse-temurin-25-noble /bin/bash -c 'PAT=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx MODEL_HOST="http://host.docker.internal:8081" mvn spring-boot:run --settings .github/workspace/settings.xml' 
+docker run --rm -it --add-host=host.docker.internal:host-gateway -p 8080:8080 -v ./:/usr/src/app:Z -w /usr/src/app maven:3.9.11-eclipse-temurin-25-noble /bin/bash -c 'MODEL_HOST="http://host.docker.internal:8081" mvn spring-boot:run --settings .github/workspace/settings.xml -Dgithub.pat=ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' 
+```
+
+To use the image of the Dockerfile, create a file named `.pat` and put your GitHub PAT in there. Then, run:
+
+```bash
+podman build --secret id=pat,src=.pat -t app .
+```
+
+To run this image, run:
+
+```bash
+docker run --rm -p 8080:8080 app
 ```
 
 If you want to use the spam detection functionality, make sure to have the backend (spam detection model) serving on `localhost:8081`.
