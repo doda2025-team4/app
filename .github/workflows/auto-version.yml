@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - fix-deployed-image-and-versioning
 
 permissions:
   contents: write
