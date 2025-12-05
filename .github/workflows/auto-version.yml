@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - f8
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,84 +14,113 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     outputs:
-      new-version: ${{ steps.next.outputs.new }}
+      version: ${{ steps.next.outputs.version }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      - name: Read current version from pom.xml
+      - name: Get previous version
         id: read
         run: |
-          VERSION=$(sed -n '/<parent>/,/<\/parent>/! s/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml | head -n1)
-          echo "current=$VERSION" >> $GITHUB_OUTPUT
+          BRANCH="${{ github.ref_name }}"
+          RELEASE_TAGS=$(git tag --merged "$BRANCH" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]$" || true)
+
+          # If no release version tags exist yet, create a v1.0.0 if on release branch.
+          if [ -z "$RELEASE_TAGS" ]; then
+            echo "No previous versions found, creating version 0.0.1"
+            echo "version=v0.0.1" >> $GITHUB_OUTPUT
+            echo "is_new=true" >> $GITHUB_OUTPUT
+            exit
+          fi
+
+          LATEST_RELEASE=$(echo "$RELEASE_TAGS" | tail -1)
+          CLEAN_LATEST_RELEASE=${LATEST_RELEASE#v}
+          echo "Latest version found: $CLEAN_LATEST_RELEASE"
+          echo "version=$CLEAN_LATEST_RELEASE" >> $GITHUB_OUTPUT
 
       - name: Determine bump type (semantic)
         id: bump
+        if: ${{ !steps.read.outputs.is_new }}
         run: |
-          MSG=$(git log -1 --pretty=%B)
-          if echo "$MSG" | grep -E "(BREAKING CHANGE|!:)"; then
+          LATEST_RELEASE="${{ steps.read.outputs.version }}"
+          COMMIT_OF_LATEST_RELEASE=$(git rev-parse "v$LATEST_RELEASE")
+
+          COMMIT_MESSAGES_SINCE_LATEST_RELEASE=$(git log "$COMMIT_OF_LATEST_RELEASE..$INPUT_BRANCH" --pretty=format:"%B")
+          BREAKING_CHANGE_INTRODUCED=$(echo "$COMMIT_MESSAGES_SINCE_LATEST_RELEASE" | grep -E 'BREAKING CHANGE|^[^:]*!:' || true)
+          FEATURE_INTRODUCED=$(echo "$COMMIT_MESSAGES_SINCE_LATEST_RELEASE" | grep -E '^feat(ure)?(\(.*\))?:' || true)
+          PATCH_INTRODUCED=$(echo "$COMMIT_MESSAGES_SINCE_LATEST_RELEASE" | grep -E '^(fix|perf(ormance)?)(\(.*\))?:' || true)
+
+          if [ -n "$BREAKING_CHANGE_INTRODUCED" ] ; then
             echo "type=major" >> $GITHUB_OUTPUT
-          elif echo "$MSG" | grep -E "^feat"; then
+          elif [ -n "$FEATURE_INTRODUCED" ]; then
             echo "type=minor" >> $GITHUB_OUTPUT
-          else
+          elif [ -n "$PATCH_INTRODUCED" ]; then
             echo "type=patch" >> $GITHUB_OUTPUT
           fi
 
       - name: Compute next version and update pom.xml
         id: next
         run: |
-          CUR=${{ steps.read.outputs.current }}
-          TYPE=${{ steps.bump.outputs.type }}
+          if [ -n "${{ steps.read.outputs.is_new }}" ]; then
+            echo "version=${{ steps.read.outputs.version }}" >> $GITHUB_OUTPUT
+            exit
+          fi
 
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CUR"
+          LATEST_RELEASE="${{ steps.read.outputs.version }}"
+          TYPE="${{ steps.bump.outputs.type }}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_RELEASE"
 
           if [ "$TYPE" = "major" ]; then
+            echo "Major version increase"
             MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
           elif [ "$TYPE" = "minor" ]; then
+            echo "Minor version increase"
             MINOR=$((MINOR+1)); PATCH=0
-          else
+          elif [ "$TYPE" = "patch" ]; then
+            echo "Patch version increase"
             PATCH=$((PATCH+1))
+          else
+            echo "No version increase"
+            exit
           fi
 
           NEW="$MAJOR.$MINOR.$PATCH"
 
-          sed -i -E "/<parent>/,/<\/parent>/! s|<version>.*</version>|<version>$NEW</version>|" pom.xml
+          mvn versions:set -DnewVersion="$NEW" -DgenerateBackupPoms=false
 
-          echo "new=$NEW" >> $GITHUB_OUTPUT
+          echo "version=$NEW" >> $GITHUB_OUTPUT
 
       - name: Commit updated version
+        if: ${{ steps.next.outputs.version }}
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add pom.xml
-          git commit -m "chore: bump version to ${{ steps.next.outputs.new }}" || echo "No changes"
+          git commit -m "chore: bump version to ${{ steps.next.outputs.version }}"
           git push
 
       - name: Create/update tag and release
+        if: ${{ steps.next.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v${{ steps.next.outputs.new }}"
+          VERSION="v${{ steps.next.outputs.version }}"
+          BRANCH="${{ github.ref_name }}"
 
-          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
-            git tag "$TAG"
-            git push origin "$TAG"
-          fi
-
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --generate-notes
-          else
-            echo "Release $TAG already exists, skipping edit"
-          fi
+          gh release create "$VERSION" --target "$BRANCH" --generate-notes
+          gh release edit "$VERSION" --latest
 
   release-image:
     needs: bump
+    if: ${{ needs.bump.outputs.version }}
     uses: ./.github/workflows/release-image.yml
     with:
-      version: ${{ needs.bump.outputs.new-version }}
+      version: ${{ needs.bump.outputs.version }}
       branch: ${{ github.ref_name }}
     secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
+      pat: ${{ secrets.MAVEN_DEPLOY_TOKEN }}

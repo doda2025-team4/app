@@ -10,7 +10,7 @@ on:
         required: true
         type: string
     secrets:
-      token:
+      pat:
         required: true
 
 permissions:
@@ -24,19 +24,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/checkout@v5
         with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Extract version from pom.xml
-        id: version
-        run: |
-          VERSION=$(grep -m1 "<version>" pom.xml | sed -E 's/.*<version>(.*)<\/version>.*/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          ref: ${{ inputs.branch }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -55,6 +45,8 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ inputs.version }}
             ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
           platforms: linux/amd64,linux/arm64
+          secrets: |
+            pat=${{ secrets.pat }}
