@@ -26,7 +26,7 @@ docker run --rm -it --add-host=host.docker.internal:host-gateway -p 8080:8080 -v
 To use the image of the Dockerfile, create a file named `.pat` and put your GitHub PAT in there. Then, run:
 
 ```bash
-podman build --secret id=pat,src=.pat -t app .
+docker build --secret id=pat,src=.pat -t app .
 ```
 
 To run this image, run:
