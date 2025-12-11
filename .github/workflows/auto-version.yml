@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - A3-monitoring
+  workflow_dispatch:
 
 permissions:
   contents: write
