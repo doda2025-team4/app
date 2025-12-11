@@ -2,6 +2,13 @@ package frontend.ctrl;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.sql.Time;
+import java.util.concurrent.atomic.AtomicInteger;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.env.Environment;
@@ -32,16 +39,34 @@ public class FrontendController {
     private final GoodSentenceGenerator goodSentenceGenerator;
     private final String goodSentenceVersionUtilLibName;
     private final String goodSentenceVersionUtilLibVersion;
+    // Metrics for A3
+    private final AtomicInteger activeRequests;   // GAUGE
+    private final Timer predictionTimer;         // TIMER
+    private final MeterRegistry registry;
 
-    public FrontendController(RestTemplateBuilder rest, Environment env) {
+    public FrontendController(RestTemplateBuilder rest, Environment env, MeterRegistry registry) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
+        this.registry = registry;
         assertModelHost();
 
         final VersionUtil goodSentenceVersionUtil = new VersionUtil();
         goodSentenceGenerator = new GoodSentenceGenerator();
         goodSentenceVersionUtilLibName = goodSentenceVersionUtil.getName();
         goodSentenceVersionUtilLibVersion = goodSentenceVersionUtil.getVersion();
+        // A3 METRICS SETUP
+        // 1. GAUGE: Active requests
+        this.activeRequests = new AtomicInteger(0);
+        Gauge.builder("sms_active_requests", activeRequests, AtomicInteger::get)
+             .tag("area", "sms_check") 
+             .register(registry);
+
+        // 3. HISTOGRAM (Timer): Distribution of latency
+        this.predictionTimer = Timer.builder("sms_prediction_latency")
+                .description("Time taken to get a prediction from model service")
+                .publishPercentiles(0.5, 0.95, 0.99) // Percentiles for Grafana
+                .publishPercentileHistogram(true) // Enable histogram for Grafana
+                .register(registry);
     }
 
     private void assertModelHost() {
@@ -74,10 +99,29 @@ public class FrontendController {
     @PostMapping({ "", "/" })
     @ResponseBody
     public Sms predict(@RequestBody Sms sms) {
-        System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
-        sms.result = getPrediction(sms);
-        System.out.printf("Prediction: %s\n", sms.result);
-        return sms;
+        // A3
+        activeRequests.incrementAndGet();
+        Timer.Sample sample = Timer.start(registry);
+        String outcome = "success";
+        try{
+            System.out.printf("Requesting prediction for \"%s\" ...\n", sms.sms);
+            sms.result = getPrediction(sms);
+            System.out.printf("Prediction: %s\n", sms.result);
+            // Increment counter if prediction was made
+            return sms;
+        }catch (Exception e) {
+            outcome = "error";
+            throw e;
+         } finally {
+            // Record time taken
+            sample.stop(predictionTimer);
+            activeRequests.decrementAndGet();
+            registry.counter("sms_predictions_total", 
+                             "component", "frontend_controller", 
+                             "outcome", outcome)                
+                    .increment();
+        }
+       
     }
 
     @GetMapping("/goodsentence")
@@ -86,7 +130,7 @@ public class FrontendController {
         final String goodSentence = goodSentenceGenerator.generateSentence();
         return new GoodSentence(goodSentence, goodSentenceVersionUtilLibName, goodSentenceVersionUtilLibVersion);
     }
-
+    
     private String getPrediction(Sms sms) {
         try {
             var url = new URI(modelHost + "/predict");
