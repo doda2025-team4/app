@@ -117,10 +117,10 @@ public class FrontendController {
             throw new IllegalArgumentException("Invalid input: SMS cannot be empty");
         }
 
-        if (sms.sms.length() > 200) {
-            // Increment counter if message too long
+        if (sms.sms.length() < 6) {
+            // Increment counter if message too short
             invalidInputCounter.increment();
-            throw new IllegalArgumentException("Invalid input: SMS too long");
+            throw new IllegalArgumentException("Invalid input: SMS too short");
         }
 
         // A3
