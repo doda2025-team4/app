@@ -44,6 +44,10 @@ public class FrontendController {
     private final Timer predictionTimer;         // TIMER
     private final MeterRegistry registry;
 
+    // Metric for A4
+    private final Counter invalidInputCounter;
+
+
     public FrontendController(RestTemplateBuilder rest, Environment env, MeterRegistry registry) {
         this.rest = rest;
         this.modelHost = env.getProperty("MODEL_HOST");
@@ -67,6 +71,13 @@ public class FrontendController {
                 .publishPercentiles(0.5, 0.95, 0.99) // Percentiles for Grafana
                 .publishPercentileHistogram(true) // Enable histogram for Grafana
                 .register(registry);
+        
+        // A4 METRIC: invalid input counter
+        this.invalidInputCounter = Counter.builder("sms_invalid_input_total")
+                .description("Number of invalid SMS inputs received")
+                .tag("component", "frontend")
+                .register(registry);
+
     }
 
     private void assertModelHost() {
@@ -99,6 +110,19 @@ public class FrontendController {
     @PostMapping({ "", "/" })
     @ResponseBody
     public Sms predict(@RequestBody Sms sms) {
+        // A4 INPUT VALIDATION
+        if (sms == null || sms.sms == null || sms.sms.strip().isEmpty()) {
+            // Increment counter if message is empty
+            invalidInputCounter.increment();
+            throw new IllegalArgumentException("Invalid input: SMS cannot be empty");
+        }
+
+        if (sms.sms.length() > 200) {
+            // Increment counter if message too long
+            invalidInputCounter.increment();
+            throw new IllegalArgumentException("Invalid input: SMS too long");
+        }
+
         // A3
         activeRequests.incrementAndGet();
         Timer.Sample sample = Timer.start(registry);
