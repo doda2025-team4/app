@@ -31,7 +31,8 @@ jobs:
 
       - name: Commit updated version
         run: |
-          CLEAN_VERSION=${${{ needs.get-version.outputs.version }}#v}
+          VERSION=${{ needs.get-version.outputs.version }}
+          CLEAN_VERSION=${VERSION#v}
           mvn versions:set -DnewVersion="$CLEAN_VERSION" -DgenerateBackupPoms=false
 
           git config user.name "github-actions"
