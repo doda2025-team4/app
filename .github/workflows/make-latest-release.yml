@@ -1,0 +1,91 @@
+name: Make Latest Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_name == 'main' }}
+    outputs:
+      version: ${{ steps.get-new-release-version.outputs.version }}
+      pre-release: ${{ steps.get-new-release-version.outputs.pre-release }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Get New Release Version
+        id: get-new-release-version
+        run: |
+          MAIN_PRERELEASE_TAGS=$(git tag --merged "main" | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+-pre-release\.[0-9]+$" || true)
+
+          if [ -z "$MAIN_PRERELEASE_TAGS" ]; then
+            echo "No pre-release version tags on main exist."
+            exit
+          fi
+
+          LATEST_MAIN_PRERELEASE=$(echo "$MAIN_PRERELEASE_TAGS" | tail -1)
+
+          echo "Latest main pre-release version is '$LATEST_MAIN_PRERELEASE'."
+          echo "pre-release=$LATEST_MAIN_PRERELEASE" >> $GITHUB_OUTPUT
+          CLEAN=${LATEST_MAIN_PRERELEASE#v}
+          CLEAN=${CLEAN%%-*}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CLEAN"
+          NEW_VERSION=v$MAJOR.$MINOR.$PATCH
+          echo "New release version is '$NEW_VERSION'."
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+  update-pom:
+    name: Updates pom.xml
+    needs: get-version
+    if: ${{ needs.get-version.outputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Commit updated version
+        run: |
+          VERSION=${{ needs.get-version.outputs.version }}
+          CLEAN_VERSION=${VERSION#v}
+          mvn versions:set -DnewVersion="$CLEAN_VERSION" -DgenerateBackupPoms=false
+
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pom.xml
+          git commit -m "chore(pom.xml): Bump version to '$CLEAN_VERSION'."
+          git push
+
+  release-version:
+    needs: get-version
+    if: ${{ needs.get-version.outputs.version }}
+    uses: ./.github/workflows/create-release.yml
+    with:
+      version: ${{ needs.get-version.outputs.version }}
+      branch: "main"
+      tag: ${{ needs.get-version.outputs.pre-release }}
+      latest: true
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
+  
+  release-image:
+    needs:
+      - get-version
+      - release-version
+    if: ${{ needs.get-version.outputs.is-new == 'true' }}
+    uses: ./.github/workflows/release-image.yml
+    with:
+      version: ${{ needs.get-version.outputs.version }}
+      latest: true
+    secrets:
+      pat: ${{ secrets.MAVEN_DEPLOY_TOKEN }}
