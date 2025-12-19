@@ -67,7 +67,9 @@ jobs:
           git push
 
   release-version:
-    needs: get-version
+    needs: 
+      - get-version
+      - update-pom
     if: ${{ needs.get-version.outputs.version }}
     uses: ./.github/workflows/create-release.yml
     with:
@@ -79,7 +81,7 @@ jobs:
       token: ${{ secrets.GITHUB_TOKEN }}
   
   release-image:
-    needs:
+    needs: 
       - get-version
       - release-version
     if: ${{ needs.get-version.outputs.version }}

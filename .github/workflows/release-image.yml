@@ -43,7 +43,7 @@ jobs:
         run: |
           TAGS="ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ inputs.version }}"
           if [ -n "${{ inputs.latest }}" ]; then
-            TAGS="$TAGS ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
+            TAGS="$TAGS\nghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
           fi
           echo "tags to be pushed: $TAGS"
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
