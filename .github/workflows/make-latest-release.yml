@@ -75,7 +75,6 @@ jobs:
     with:
       version: ${{ needs.get-version.outputs.version }}
       branch: "main"
-      tag: ${{ needs.get-version.outputs.pre-release }}
       latest: true
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}

@@ -9,9 +9,6 @@ on:
       branch:
         required: true
         type: string
-      tag:
-        required: false
-        type: string
       latest:
         required: false
         type: string
@@ -31,16 +28,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag || inputs.branch }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
       - run: |
-          TARGET=${{ inputs.branch }}
-          if [ -n "${{ inputs.tag }}" ]; then
-            COMMIT_OF_TAG=$(git rev-parse "${{ inputs.tag }}")
-            TARGET=${COMMIT_OF_TAG:+$TARGET}
-          fi
-
-          gh release create ${{ inputs.version }} --target $TARGET --generate-notes
+          gh release create ${{ inputs.version }} --target ${{ inputs.branch }} --generate-notes
           if [ -n "${{ inputs.latest }}" ]; then
             gh release edit ${{ inputs.version }} --latest
           else
