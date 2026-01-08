@@ -114,13 +114,11 @@ public class FrontendController {
         if (sms == null || sms.sms == null || sms.sms.strip().isEmpty()) {
             // Increment counter if message is empty
             invalidInputCounter.increment();
-            throw new IllegalArgumentException("Invalid input: SMS cannot be empty");
         }
 
         if (sms.sms.length() < 6) {
             // Increment counter if message too short
             invalidInputCounter.increment();
-            throw new IllegalArgumentException("Invalid input: SMS too short");
         }
 
         // A3
