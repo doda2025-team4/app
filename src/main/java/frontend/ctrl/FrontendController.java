@@ -116,7 +116,10 @@ public class FrontendController {
             invalidInputCounter.increment();
 
             // This is only on the Canary version
-            throw new IllegalArgumentException("Invalid input: SMS cannot be empty");
+            throw new ValidationException(
+                "SMS_EMPTY",
+                "SMS cannot be empty"
+            );
         }
 
         if (sms.sms.length() < 6) {
@@ -124,7 +127,10 @@ public class FrontendController {
             invalidInputCounter.increment();
 
             // This is only on the Canary version
-            throw new IllegalArgumentException("Invalid input: SMS too short");
+            throw new ValidationException(
+                "SMS_TOO_SHORT",
+                "SMS must be at least 6 characters"
+            );
         }
 
         // A3

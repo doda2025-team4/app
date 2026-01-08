@@ -61,9 +61,16 @@ $(document).ready(function() {
 	}
 	
 	function handleError(e) {
-		cleanResult()		
+		cleanResult()
 		$("#result").addClass("error")
-		$("#result").html("An error occured (see server log).")
+
+		let msg = "An error occurred (see server log)."
+
+		if (e.responseJSON && e.responseJSON.code && e.responseJSON.message) {
+			msg = `${e.responseJSON.message}`
+		}
+
+		$("#result").html(msg)
 		$("#result").show()
 	}
 	
